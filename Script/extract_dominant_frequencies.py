@@ -2,7 +2,7 @@ import sys
 import os
 import json
 
-# --- Controllo moduli necessari ---
+# --- Check required modules ---
 missing = []
 
 try:
@@ -16,10 +16,10 @@ except ImportError:
     missing.append("soundfile")
 
 if missing:
-    print("Errore: mancano i seguenti moduli Python necessari:")
+    print("Error: The following Python modules are required but missing:")
     for m in missing:
         print(f"  - {m}")
-    print("\nInstalla i moduli mancanti con il seguente comando:")
+    print("\nInstall the missing modules with the following command:")
     print(f"pip install {' '.join(missing)}")
     sys.exit(1)
 
@@ -39,11 +39,14 @@ def extract_dominant_frequencies(audio_data, samplerate, samples_per_group):
             continue
         # Remove DC offset
         chunk = chunk - np.mean(chunk)
-        # FFT
+        # FFT requires at least 2 samples
+        if len(chunk) < 2:
+            frequencies.append(0.0)
+            continue
         spectrum = np.fft.rfft(chunk)
         freqs = np.fft.rfftfreq(len(chunk), d=1.0/samplerate)
         magnitudes = np.abs(spectrum)
-        # Trova la frequenza dominante (massimo del modulo)
+        # Find the dominant frequency (peak magnitude)
         peak_idx = np.argmax(magnitudes)
         dominant_freq = freqs[peak_idx]
         frequencies.append(dominant_freq)
@@ -108,31 +111,35 @@ def main():
 
     # Check settings.json exists
     if not os.path.isfile(settings_path):
-        print(f"Errore: {settings_path} non trovato.")
+        print(f"Error: {settings_path} not found.")
         sys.exit(1)
 
-    # Carica parametri
+    # Load parameters
     settings = load_settings(settings_path)
     samples_per_group = settings.get('samples_per_group', 1024)
 
-    # Trova tutti i file audio supportati
-    audio_files = get_audio_files()
-    if not audio_files:
-        print("Nessun file audio supportato trovato nella cartella corrente.")
+    if samples_per_group < 2:
+        print("Error: 'samples_per_group' must be at least 2 to calculate the dominant frequency.")
         sys.exit(1)
 
-    # Se c'è solo un file audio, processalo direttamente
+    # Find all supported audio files
+    audio_files = get_audio_files()
+    if not audio_files:
+        print("No supported audio files found in the current directory.")
+        sys.exit(1)
+
+    # If there is only one audio file, process it directly
     if len(audio_files) == 1:
         print(f"Found only one audio file: {audio_files[0]}. Processing automatically.")
         files_to_process = audio_files
     else:
-        # Chiedi all'utente quali file analizzare
+        # Ask the user which files to process
         files_to_process = choose_files(audio_files)
 
-    # Crea cartella output se non esiste
+    # Create output folder if it does not exist
     ensure_output_folder(output_folder)
 
-    # Processa ogni file selezionato
+    # Process each selected file
     for audio_path in files_to_process:
         process_file(audio_path, samples_per_group, output_folder)
 
