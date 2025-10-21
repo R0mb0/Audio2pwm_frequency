@@ -121,8 +121,13 @@ def main():
         print("Nessun file audio supportato trovato nella cartella corrente.")
         sys.exit(1)
 
-    # Chiedi all'utente quali file analizzare
-    files_to_process = choose_files(audio_files)
+    # Se c'è solo un file audio, processalo direttamente
+    if len(audio_files) == 1:
+        print(f"Found only one audio file: {audio_files[0]}. Processing automatically.")
+        files_to_process = audio_files
+    else:
+        # Chiedi all'utente quali file analizzare
+        files_to_process = choose_files(audio_files)
 
     # Crea cartella output se non esiste
     ensure_output_folder(output_folder)
