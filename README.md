@@ -1,6 +1,10 @@
 # 🎼 Dominant Frequency Extractor for Arduino PWM
 
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/f4217055ad964b989922942953a5894c)](https://app.codacy.com/gh/R0mb0/Audio2pwm_frequency/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/R0mb0/Audio2pwm_frequency)
+[![Open Source Love svg3](https://badges.frapsoft.com/os/v3/open-source.svg?v=103)](https://github.com/R0mb0/Audio2pwm_frequency)
+[![MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/license/mit)
+[![Donate](https://img.shields.io/badge/PayPal-Donate%20to%20Author-blue.svg)](http://paypal.me/R0mb0)
 
 This Python script extracts the dominant frequency sequence from audio files and exports them as text files, ready for Arduino PWM sound reproduction. 
 You can choose the extraction algorithm via the `settings.json` file.
