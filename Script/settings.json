@@ -1,3 +1,4 @@
 {
-  "samples_per_group": 1024
+  "samples_per_group": 300,
+  "algorithm": "autocorrelation"
 }

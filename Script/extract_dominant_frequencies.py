@@ -29,27 +29,78 @@ def load_settings(settings_path):
     with open(settings_path, 'r') as f:
         return json.load(f)
 
-def extract_dominant_frequencies(audio_data, samplerate, samples_per_group):
+def dominant_frequency_fft(chunk, samplerate):
+    if len(chunk) < 2:
+        return 0.0
+    chunk = chunk - np.mean(chunk)
+    spectrum = np.fft.rfft(chunk)
+    freqs = np.fft.rfftfreq(len(chunk), d=1.0/samplerate)
+    magnitudes = np.abs(spectrum)
+    peak_idx = np.argmax(magnitudes)
+    return freqs[peak_idx]
+
+def dominant_frequency_autocorrelation(chunk, samplerate):
+    if len(chunk) < 2:
+        return 0.0
+    chunk = chunk - np.mean(chunk)
+    autocorr = np.correlate(chunk, chunk, mode='full')
+    autocorr = autocorr[len(autocorr)//2:]
+    # Find first minimum (to avoid zero lag) and then next peak
+    d = np.diff(autocorr)
+    start = np.where(d > 0)[0]
+    if len(start) == 0:
+        return 0.0
+    start = start[0]
+    peak = np.argmax(autocorr[start:]) + start
+    if peak == 0:
+        return 0.0
+    return samplerate / peak
+
+def dominant_frequency_zcr(chunk, samplerate):
+    if len(chunk) < 2:
+        return 0.0
+    zero_crossings = np.where(np.diff(np.sign(chunk)))[0]
+    if len(zero_crossings) < 2:
+        return 0.0
+    avg_period = np.mean(np.diff(zero_crossings))  # in samples
+    if avg_period == 0:
+        return 0.0
+    freq = samplerate / avg_period
+    return freq
+
+def dominant_frequency_cepstrum(chunk, samplerate):
+    if len(chunk) < 2:
+        return 0.0
+    chunk = chunk - np.mean(chunk)
+    spectrum = np.fft.fft(chunk)
+    log_spectrum = np.log(np.abs(spectrum) + 1e-10)
+    cepstrum = np.fft.ifft(log_spectrum).real
+    # ignore the very low quefrency (DC and near-zero)
+    min_quefrency = int(samplerate / 1000)  # ignore < 1000 Hz
+    peak = np.argmax(cepstrum[min_quefrency:]) + min_quefrency
+    if peak == 0:
+        return 0.0
+    freq = samplerate / peak
+    return freq
+
+ALGORITHM_FUNCTIONS = {
+    "fft": dominant_frequency_fft,
+    "autocorrelation": dominant_frequency_autocorrelation,
+    "zcr": dominant_frequency_zcr,
+    "cepstrum": dominant_frequency_cepstrum
+}
+
+def extract_dominant_frequencies(audio_data, samplerate, samples_per_group, algorithm):
     num_samples = len(audio_data)
     frequencies = []
+    func = ALGORITHM_FUNCTIONS.get(algorithm, dominant_frequency_fft)
     for start in range(0, num_samples, samples_per_group):
         end = min(start + samples_per_group, num_samples)
         chunk = audio_data[start:end]
         if len(chunk) == 0:
             continue
-        # Remove DC offset
-        chunk = chunk - np.mean(chunk)
-        # FFT requires at least 2 samples
-        if len(chunk) < 2:
-            frequencies.append(0.0)
-            continue
-        spectrum = np.fft.rfft(chunk)
-        freqs = np.fft.rfftfreq(len(chunk), d=1.0/samplerate)
-        magnitudes = np.abs(spectrum)
-        # Find the dominant frequency (peak magnitude)
-        peak_idx = np.argmax(magnitudes)
-        dominant_freq = freqs[peak_idx]
-        frequencies.append(dominant_freq)
+        freq = func(chunk, samplerate)
+        frequencies.append(freq)
     return frequencies
 
 def get_audio_files():
@@ -78,7 +129,6 @@ def ensure_output_folder(folder='output'):
         os.makedirs(folder)
 
 def next_available_filename(base, folder, ext=".txt"):
-    # Handle files like base.txt, base1.txt, base2.txt, etc.
     candidate = os.path.join(folder, base + ext)
     if not os.path.exists(candidate):
         return candidate
@@ -89,7 +139,7 @@ def next_available_filename(base, folder, ext=".txt"):
             return candidate
         n += 1
 
-def process_file(audio_path, samples_per_group, output_folder):
+def process_file(audio_path, samples_per_group, algorithm, output_folder):
     try:
         audio_data, samplerate = sf.read(audio_path)
     except Exception as e:
@@ -97,13 +147,14 @@ def process_file(audio_path, samples_per_group, output_folder):
         return
     if len(audio_data.shape) > 1:
         audio_data = audio_data[:, 0]
-    frequencies = extract_dominant_frequencies(audio_data, samplerate, samples_per_group)
+    frequencies = extract_dominant_frequencies(audio_data, samplerate, samples_per_group, algorithm)
     base_name = os.path.splitext(os.path.basename(audio_path))[0]
     output_path = next_available_filename(base_name, output_folder)
     with open(output_path, 'w') as f:
+        f.write(f"# Algorithm used: {algorithm}\n")
         for freq in frequencies:
             f.write(f"{freq:.2f}\n")
-    print(f"File '{audio_path}' processed. Output: '{output_path}'")
+    print(f"File '{audio_path}' processed. Output: '{output_path}' (Algorithm: {algorithm})")
 
 def main():
     settings_path = "settings.json"
@@ -117,31 +168,31 @@ def main():
     # Load parameters
     settings = load_settings(settings_path)
     samples_per_group = settings.get('samples_per_group', 1024)
+    algorithm = settings.get('algorithm', 'fft').lower()
 
     if samples_per_group < 2:
         print("Error: 'samples_per_group' must be at least 2 to calculate the dominant frequency.")
         sys.exit(1)
 
-    # Find all supported audio files
+    if algorithm not in ALGORITHM_FUNCTIONS:
+        print(f"Error: Unknown algorithm '{algorithm}'. Supported algorithms are: {list(ALGORITHM_FUNCTIONS.keys())}")
+        sys.exit(1)
+
     audio_files = get_audio_files()
     if not audio_files:
         print("No supported audio files found in the current directory.")
         sys.exit(1)
 
-    # If there is only one audio file, process it directly
     if len(audio_files) == 1:
         print(f"Found only one audio file: {audio_files[0]}. Processing automatically.")
         files_to_process = audio_files
     else:
-        # Ask the user which files to process
         files_to_process = choose_files(audio_files)
 
-    # Create output folder if it does not exist
     ensure_output_folder(output_folder)
 
-    # Process each selected file
     for audio_path in files_to_process:
-        process_file(audio_path, samples_per_group, output_folder)
+        process_file(audio_path, samples_per_group, algorithm, output_folder)
 
 if __name__ == "__main__":
     main()
