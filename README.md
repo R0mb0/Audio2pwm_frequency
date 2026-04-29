@@ -10,6 +10,17 @@
 This Python script extracts the dominant frequency sequence from audio files and exports them as text files, ready for Arduino PWM sound reproduction. 
 You can choose the extraction algorithm via the `settings.json` file.
 
+<div align="center">
+  <a href="http://paypal.me/R0mb0">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/R0mb0/Support_the_dev_badge/blob/main/Badge/SVG/Support_the_dev_badge_Dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://github.com/R0mb0/Support_the_dev_badge/blob/main/Badge/SVG/Support_the_dev_badge_Light.svg">
+      <img alt="Saved you time? Support the dev" src="https://github.com/R0mb0/Support_the_dev_badge/blob/main/Badge/SVG/Support_the_dev_badge_Default.svg">
+    </picture>
+  </a>
+</div>
+
+
 ## ⚡ Supported Algorithms
 
 - **fft**: Fast Fourier Transform. Good for simple, relatively stationary signals.
